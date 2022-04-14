@@ -142,6 +142,24 @@ typedef unsigned int CUdeviceptr;
 #  define CUDA_CB
 #endif
 
+#define CUDA_SUCCEED_FATAL(x) cuda_api_succeed_fatal(x, #x, __FILE__, __LINE__)
+#define CUDA_SUCCEED_NONFATAL(x) cuda_api_succeed_nonfatal(x, #x, __FILE__, __LINE__)
+#define NVRTC_SUCCEED_FATAL(x) nvrtc_api_succeed_fatal(x, #x, __FILE__, __LINE__)
+#define NVRTC_SUCCEED_NONFATAL(x) nvrtc_api_succeed_nonfatal(x, #x, __FILE__, __LINE__)
+// Take care not to override an existing error.
+#define CUDA_SUCCEED_OR_RETURN(e) {               \
+    char *serror = CUDA_SUCCEED_NONFATAL(e);      \
+    if (serror) {                                 \
+      if (!ctx->error) {                          \
+        ctx->error = serror;                      \
+        return bad;                               \
+      } else {                                    \
+        free(serror);                             \
+      }                                           \
+    }                                             \
+  }
+
+
 typedef int CUdevice;
 typedef struct CUctx_st* CUcontext;
 typedef struct CUmod_st* CUmodule;
@@ -609,7 +627,6 @@ typedef enum cudaError_enum {
   CUDA_ERROR_INVALID_GRAPHICS_CONTEXT = 219,
   CUDA_ERROR_NVLINK_UNCORRECTABLE = 220,
   CUDA_ERROR_JIT_COMPILER_NOT_FOUND = 221,
-  CUDA_ERROR_UNSUPPORTED_PTX_VERSION = 222,
   CUDA_ERROR_INVALID_SOURCE = 300,
   CUDA_ERROR_FILE_NOT_FOUND = 301,
   CUDA_ERROR_SHARED_OBJECT_SYMBOL_NOT_FOUND = 302,
@@ -646,8 +663,7 @@ typedef enum CUdevice_P2PAttribute_enum {
   CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK = 0x01,
   CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED = 0x02,
   CU_DEVICE_P2P_ATTRIBUTE_NATIVE_ATOMIC_SUPPORTED = 0x03,
-  CU_DEVICE_P2P_ATTRIBUTE_ACCESS_ACCESS_SUPPORTED = 0x04,
-  CU_DEVICE_P2P_ATTRIBUTE_CUDA_ARRAY_ACCESS_SUPPORTED = 0x04,
+  CU_DEVICE_P2P_ATTRIBUTE_ARRAY_ACCESS_ACCESS_SUPPORTED = 0x04,
 } CUdevice_P2PAttribute;
 
 typedef void (CUDA_CB *CUstreamCallback)(CUstream hStream, CUresult status, void* userData);
@@ -1381,6 +1397,35 @@ enum {
 	CUEW_INIT_NVRTC = 2
 };
 
+// CUDA_SUCCEED_OR_RETURN returns the value of the variable 'bad' in
+// scope.  By default, it will be this one.  Create a local variable
+// of some other type if needed.  This is a bit of a hack, but it
+// saves effort in the code generator.
+static const int bad = 1;
+
+static inline void cuda_api_succeed_fatal(CUresult res, const char *call,
+    const char *file, int line) {
+  if (res != CUDA_SUCCESS) {
+    const char *err_str;
+    cuGetErrorString(res, &err_str);
+    if (err_str == NULL) { err_str = "Unknown"; }
+    futhark_panic(-1, "%s:%d: CUDA call\n  %s\nfailed with error code %d (%s)\n",
+        file, line, call, res, err_str);
+  }
+}
+
+static char* cuda_api_succeed_nonfatal(CUresult res, const char *call,
+    const char *file, int line) {
+  if (res != CUDA_SUCCESS) {
+    const char *err_str;
+    cuGetErrorString(res, &err_str);
+    if (err_str == NULL) { err_str = "Unknown"; }
+    return msgprintf("%s:%d: CUDA call\n  %s\nfailed with error code %d (%s)\n",
+        file, line, call, res, err_str);
+  } else {
+    return NULL;
+  }
+}
 int cuewInit(cuuint32_t flags);
 const char *cuewErrorString(CUresult result);
 const char *cuewCompilerPath(void);

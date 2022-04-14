@@ -89,6 +89,7 @@ translateGPU target prog =
   where
     genPrelude TargetOpenCL = genOpenClPrelude
     genPrelude TargetCUDA = const genCUDAPrelude
+    genPrelude TargetCUEW = const genCUDAPrelude
 
 -- | Due to simplifications after kernel extraction, some threshold
 -- parameters may contain KernelPaths that reference threshold
@@ -375,6 +376,13 @@ onKernel target kernel = do
           [C.citem|__local volatile unsigned char* restrict $id:mem = (__local volatile unsigned char*) $id:mem_aligned;|]
         )
     prepareLocalMemory TargetCUDA (mem, size) = do
+      param <- newVName $ baseString mem ++ "_offset"
+      return
+        ( Just $ SharedMemoryKArg size,
+          Just [C.cparam|uint $id:param|],
+          [C.citem|volatile $ty:defaultMemBlockType $id:mem = &shared_mem[$id:param];|]
+        )
+    prepareLocalMemory TargetCUEW (mem, size) = do
       param <- newVName $ baseString mem ++ "_offset"
       return
         ( Just $ SharedMemoryKArg size,

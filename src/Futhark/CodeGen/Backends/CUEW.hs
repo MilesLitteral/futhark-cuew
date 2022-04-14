@@ -244,13 +244,13 @@ staticCUDAArray name "device" t vs = do
   GC.item [C.citem|struct memblock_device $id:name = ctx->$id:name;|]
 staticCUDAArray _ space _ _ =
   error $
-    "CUDA backend cannot create static array in '" ++ space
+    "CUEW backend cannot create static array in '" ++ space
       ++ "' memory space"
 
 cudaMemoryType :: GC.MemoryType OpenCL ()
 cudaMemoryType "device" = return [C.cty|typename CUdeviceptr|]
 cudaMemoryType space =
-  error $ "CUDA backend does not support '" ++ space ++ "' memory space."
+  error $ "CUEW backend does not support '" ++ space ++ "' memory space."
 
 callKernel :: GC.OpCompiler OpenCL ()
 callKernel (GetSize v key) =

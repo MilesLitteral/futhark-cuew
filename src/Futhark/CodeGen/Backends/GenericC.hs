@@ -1517,6 +1517,7 @@ asServer parts =
 
 -- | Compile imperative program to a C program.  Always uses the
 -- function named "main" as entry point, so make sure it is defined.
+-- $header_extra
 compileProg ::
   MonadFreshNames m =>
   T.Text ->
@@ -1606,7 +1607,7 @@ $timingH
 #include <assert.h>
 #include <ctype.h>
 
-$header_extra
+//header_extra
 
 $lockH
 
